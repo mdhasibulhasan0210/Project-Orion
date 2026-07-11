@@ -1,85 +1,85 @@
 {
-  "name": "orion-agent",
-  "productName": "Orion Agent",
-  "version": "1.0.1",
-  "description": "Orion Remote Management Agent – silently monitors and accepts remote commands from the Orion dashboard.",
-  "main": "main.js",
-  "author": "Orion Platform <mdhasibulhasan0210@github.com>",
-  "license": "MIT",
-  "scripts": {
-    "start": "electron .",
-    "build:win": "electron-builder --win --x64",
-    "build": "electron-builder"
-  },
-  "dependencies": {
-    "auto-launch": "^5.0.6",
-    "electron-store": "^8.2.0",
-    "electron-updater": "^6.1.8",
-    "firebase": "^10.8.0",
-    "node-machine-id": "^1.1.12",
-    "systeminformation": "^5.21.22",
-    "uuid": "^9.0.1",
-    "zod": "^3.22.4"
-  },
-  "devDependencies": {
-    "electron": "^28.3.3",
-    "electron-builder": "^24.13.3"
-  },
-  "build": {
-    "appId": "com.orion.agent",
-    "productName": "Orion Agent",
-    "copyright": "Copyright © 2024 Orion Platform",
-    "directories": {
-      "output": "dist"
-    },
-    "files": [
-      "main.js",
-      "preload.js",
-      "setup.html",
-      "setup.js",
-      "setup.css",
-      "assets/**/*"
-    ],
-    "extraResources": [
-      {
-        "from": "assets/",
-        "to": "assets/"
-      }
-    ],
-    "win": {
-      "target": [
-        {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
-        }
-      ],
-      "icon": "assets/icon.ico",
-      "requestedExecutionLevel": "asInvoker"
-    },
-    "nsis": {
-      "oneClick": false,
-      "perMachine": false,
-      "allowElevation": true,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "runAfterFinish": true,
-      "installerIcon": "assets/icon.ico",
-      "uninstallerIcon": "assets/icon.ico",
-      "installerHeaderIcon": "assets/icon.ico",
-      "deleteAppDataOnUninstall": false,
-      "displayLanguageSelector": false,
-      "include": "installer.nsh"
-    },
-    "publish": [
-      {
-        "provider": "github",
-        "owner": "mdhasibulhasan0210",
-        "repo": "Project-Orion",
-        "releaseType": "release"
-      }
-    ]
-  }
+    "name":  "orion-agent",
+    "productName":  "Orion Agent",
+    "version":  "1.0.2",
+    "description":  "Orion Remote Management Agent – silently monitors and accepts remote commands from the Orion dashboard.",
+    "main":  "main.js",
+    "author":  "Orion Platform \u003cmdhasibulhasan0210@github.com\u003e",
+    "license":  "MIT",
+    "scripts":  {
+                    "start":  "electron .",
+                    "build:win":  "electron-builder --win --x64",
+                    "build":  "electron-builder"
+                },
+    "dependencies":  {
+                         "auto-launch":  "^5.0.6",
+                         "electron-store":  "^8.2.0",
+                         "electron-updater":  "^6.1.8",
+                         "firebase":  "^10.8.0",
+                         "node-machine-id":  "^1.1.12",
+                         "systeminformation":  "^5.21.22",
+                         "uuid":  "^9.0.1",
+                         "zod":  "^3.22.4"
+                     },
+    "devDependencies":  {
+                            "electron":  "^28.3.3",
+                            "electron-builder":  "^24.13.3"
+                        },
+    "build":  {
+                  "appId":  "com.orion.agent",
+                  "productName":  "Orion Agent",
+                  "copyright":  "Copyright © 2024 Orion Platform",
+                  "directories":  {
+                                      "output":  "dist"
+                                  },
+                  "files":  [
+                                "main.js",
+                                "preload.js",
+                                "setup.html",
+                                "setup.js",
+                                "setup.css",
+                                "assets/**/*"
+                            ],
+                  "extraResources":  [
+                                         {
+                                             "from":  "assets/",
+                                             "to":  "assets/"
+                                         }
+                                     ],
+                  "win":  {
+                              "target":  [
+                                             {
+                                                 "target":  "nsis",
+                                                 "arch":  [
+                                                              "x64"
+                                                          ]
+                                             }
+                                         ],
+                              "icon":  "assets/icon.ico",
+                              "requestedExecutionLevel":  "asInvoker"
+                          },
+                  "nsis":  {
+                               "oneClick":  false,
+                               "perMachine":  false,
+                               "allowElevation":  true,
+                               "allowToChangeInstallationDirectory":  true,
+                               "createDesktopShortcut":  true,
+                               "createStartMenuShortcut":  true,
+                               "runAfterFinish":  true,
+                               "installerIcon":  "assets/icon.ico",
+                               "uninstallerIcon":  "assets/icon.ico",
+                               "installerHeaderIcon":  "assets/icon.ico",
+                               "deleteAppDataOnUninstall":  false,
+                               "displayLanguageSelector":  false,
+                               "include":  "installer.nsh"
+                           },
+                  "publish":  [
+                                  {
+                                      "provider":  "github",
+                                      "owner":  "mdhasibulhasan0210",
+                                      "repo":  "Project-Orion",
+                                      "releaseType":  "release"
+                                  }
+                              ]
+              }
 }
