@@ -1,0 +1,112 @@
+
+Build a complete SaaS product: web dashboard (React) + Windows desktop agent (Electron). User installs agent, signs in, manages own PCs remotely.
+
+## Tech Stack & Structure
+- Web: React 18, Vite, TypeScript strict, TailwindCSS, Framer Motion (lazy), GSAP (ScrollTrigger only), React Router v6, React Query v5, React Hook Form + Zod
+- Backend: Firebase Auth, Firestore, Storage, FCM (Cloud Messaging), Cloud Functions (for command signing)
+- Desktop Agent: Electron 28+, Node.js 20, electron-builder, electron-updater, auto-launch
+- Monorepo folders: /web, /agent, /shared (types, constants), /firebase (rules, indexes), /docs
+
+## Core Features – Build All
+
+### Authentication
+- Emial/password assigned by the owner from the firebase authentication
+### Dashboard
+- Device grid (lazy loaded). Each card shows: computerName, online/offline (green/red dot), lastSeen, CPU%, RAM%, disk%, Windows version, uptime, IP, agentVersion
+- Real‑time: Firestore `devices/{deviceId}` doc + `deviceStatus/{deviceId}` via `onSnapshot` (unsub on unmount)
+- Click card navigates to Device Control Panel
+
+### Device Control Panel (lazy routes)
+- Power: shutdown, restart, sleep, hibernate, lock, logoff – send command via Firestore
+- Applications: list processes, kill process, launch app by path (command/result pattern)
+- File Manager: browse drives, create/rename/move/copy/delete files/folders, upload/download (use Firebase Storage for large files, commands for metadata)
+- Clipboard: read/write remote clipboard
+- System Info: CPU model/cores, GPU, total/free RAM, disk partitions, battery %, network interfaces, installed apps, Windows & agent version
+
+### Screen & Media
+- Screenshot: capture, compress to JPEG (max 1280px), store thumb (base64) in Firestore, full image in Storage
+- Live View: optional WebRTC peer connection when user enables; fallback: 1fps screenshot stream via command polling
+- Remote Announcement: **two modes**:
+  1. Text-to-speech: send text, agent speaks via system TTS (PowerShell)
+  2. Voice message: record from dashboard mic, upload to Storage, agent downloads and plays through speakers
+
+### Notifications
+- Firestore collection `notifications/{userId}/items/{notifId}`
+- Triggers: battery<20%, CPU>90%, agent offline>2min, agent back online, storage<10%, new agent version available
+- Push via FCM when dashboard is closed (optional)
+
+### Landing Page (marketing)
+- Sections: Hero with animated Orion logo (Framer Motion), Feature cards, Download Agent link, How It Works, Screenshots, FAQ, Footer
+- Dark theme, same design tokens as dashboard, premium glassmorphism
+
+### Responsive Design
+- Mobile-first: sidebar collapses to drawer (hamburger), device cards stack, no horizontal overflow
+- Tablet/desktop: sidebar persistent, grid adapts columns (1–2–3–4)
+- All modals, panels touch-friendly
+
+## UI Design System (Exact Tokens)
+- Background: #05070A
+- Card: rgba(17,24,39,0.8) + backdrop-blur-lg, rounded-2xl, border border-white/5
+- Accent: #00BFFF
+- Glow: box-shadow 0 0 30px rgba(0,191,255,0.3)
+- Text: primary white, secondary #94A3B8
+- Font: Inter, system-ui
+- Animations: Framer Motion for page transitions, hover/tap effects; GSAP ScrollTrigger only on landing page (tree‑shakeable)
+
+## Agent (Electron) – Full Specification
+- Background service: runs in system tray, minimize to tray, optional start with Windows (auto-launch)
+- Heartbeat: every 5s write `deviceStatus/{deviceId}` doc with {online:true, lastSeen:serverTimestamp, cpu, ram, disk, uptime, ip, ...}
+- Command listener: realtime `commands/{deviceId}` doc. On new command → execute → write result to `commandResults/{commandId}`, then clear command doc
+- Security:
+  - `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`
+  - IPC channels only: "get-system-info", "execute-command", "file-operation", "audio-play". Validate payloads with Zod schemas.
+- Auto‑update: electron‑updater with GitHub releases, silent download, prompt install
+- Installer (NSIS): include license agreement, privacy policy, choose install location, create desktop shortcut, create start menu shortcut, option to launch at startup. After install → open one‑time setup window for sign‑in + device registration.
+
+### Installer / Device Registration Flow
+1. Installer shows: License → Privacy → Install Location → Desktop Shortcut → Start Menu → Launch at Startup → Install
+2. After finish, agent starts, opens a setup window (light Electron BrowserWindow)
+3. User signs in with Firebase (email/password or Google)
+4. Device generates unique ID (UUID), registers in Firestore `devices/{deviceId}` with userId, computerName, os, agentVersion
+5. Agent saves refresh token securely (using safeStorage) for future auto‑reconnect
+6. Window closes, agent runs in tray. Device appears in dashboard.
+
+## Firestore Data Model & Indexes
+Collections:
+- `users/{uid}` : {email, displayName, photoURL, trustedDevices[]}
+- `devices/{deviceId}` : {userId, computerName, os, agentVersion, addedAt}
+- `deviceStatus/{deviceId}` : {online, lastSeen, cpu, ram, disk, uptime, ip, osVersion, agentVersion} (updated by agent only)
+- `commands/{deviceId}` : {command, params, timestamp, status} (device watches this doc)
+- `commandResults/{commandId}` : {deviceId, result, error, completedAt}
+- `notifications/{userId}/items/{notifId}` : {type, message, read, timestamp}
+- `activityLogs/{userId}/logs/{logId}` : {deviceId, action, timestamp, ip}
+- `settings/{userId}` : {secretKey (encrypted, used for command HMAC), preferences}
+
+Composite Indexes:
+- devices: userId ASC, addedAt DESC
+- deviceStatus: online DESC, lastSeen DESC
+- commands: deviceId ASC, timestamp DESC
+- notifications: userId ASC, timestamp DESC
+- activityLogs: userId ASC, timestamp DESC
+
+## Security (Must Implement)
+- Firestore rules: user can only access their own docs; agent writes only its own `deviceStatus` and watches only its own `commands/{deviceId}`; command results written by agent, read by user
+- Command integrity: every command doc includes `signature = HMAC(deviceId+command+timestamp, userSecret)`. Agent verifies signature before execution.
+  - **Command signing**: implemented via Firebase Callable Function `signCommand` – it uses the user’s secret (stored encrypted in Firestore `settings/{userId}`) to sign the payload server‑side. Dashboard calls this function, gets signed payload, writes to Firestore. Client never sees secret.
+- Electron IPC: strict channel whitelist, Zod validation on all messages
+- Activity log: log every remote action (power, file operation, etc.) with timestamp and IP
+- Optional MFA: use Firebase MFA (SMS/TOTP) if enabled
+- Never expose keys, secrets, or tokens in frontend bundles
+
+## Quality & Production Rules
+- Strict TypeScript: no `any` (use unknown/generics)
+- All data fetching via React Query, with loading skeletons and error boundaries
+- Feature‑based folder structure: `features/auth`, `features/dashboard`, `features/device`, etc.
+- Reusable components: Button, Card, Badge, Modal, Input, etc.
+- Code splitting: lazy‑load every route and heavy component (file manager, live view)
+- Accessibility: semantic HTML, ARIA labels, keyboard navigation, focus trap in modals
+- Keyboard shortcuts: e.g., Ctrl+K command palette, Esc to close modals
+- No placeholder UI – every screen must be fully designed
+- Dark mode only (no toggle)
+- Bundle optimization: initial JS < 150 KB gzipped, tree‑shake GSAP/Framer Motion, use Vite’s automatic vendor chunking
+- Agent memory: main process only (no hidden renderer), heartbeat interval throttled to 5s, use native Node add‑ons only when necessary
