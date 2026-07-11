@@ -1,11 +1,6 @@
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
-import { getAuth, connectAuthEmulator, Auth } from 'firebase/auth';
-import {
-  getFirestore,
-  connectFirestoreEmulator,
-  Firestore,
-  enableMultiTabIndexedDbPersistence,
-} from 'firebase/firestore';
+import { getAuth, Auth } from 'firebase/auth';
+import { getFirestore, Firestore } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 import { getFunctions, Functions } from 'firebase/functions';
 
@@ -28,15 +23,7 @@ export const db:        Firestore        = getFirestore(app);
 export const storage:   FirebaseStorage  = getStorage(app);
 export const functions: Functions        = getFunctions(app);
 
-// Enable offline persistence (graceful fail if multi-tab unsupported)
-enableMultiTabIndexedDbPersistence(db).catch((err) => {
-  if (err.code === 'failed-precondition') {
-    // Multiple tabs open — only one tab gets persistence
-    console.warn('[Firestore] Persistence unavailable (multiple tabs)');
-  } else if (err.code === 'unimplemented') {
-    // Browser doesn't support persistence
-    console.warn('[Firestore] Persistence not supported in this browser');
-  }
-});
+// NOTE: No IndexedDB persistence — real-time status data (heartbeat) must always
+// be fresh. Persistence was causing stale "Offline" status on mobile devices.
 
 export { app };

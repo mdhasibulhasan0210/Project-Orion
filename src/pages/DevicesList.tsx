@@ -156,7 +156,8 @@ export default function DevicesList() {
 
 /* ── Device Card ── */
 function DeviceCard({ device }: { device: DeviceWithStatus }) {
-  const isOnline = !!(device.status?.online && (Date.now() - (device.status.lastSeen || 0) < 20000));
+  // 60s window handles mobile network latency + Firestore propagation + clock skew
+  const isOnline = !!(device.status?.online === true && (Date.now() - (device.status.lastSeen || 0) < 60000));
   const cpu  = device.status?.cpu  ?? null;
   const ram  = device.status?.ram  ?? null;
   const disk = device.status?.disk ?? null;

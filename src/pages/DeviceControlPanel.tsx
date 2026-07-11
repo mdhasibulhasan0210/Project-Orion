@@ -1,19 +1,16 @@
 import React from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useEffect, useState, useCallback } from 'react';
-import { db, functions } from '../lib/firebase';
-import { doc, onSnapshot, collection, addDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { httpsCallable } from 'firebase/functions';
+import { db } from '../lib/firebase';
 import { Device, DeviceStatus } from '../../shared/types';
 import {
   Power, Terminal, Folder, Clipboard, Info, Activity,
   Camera, ArrowLeft, RotateCw, Moon, Lock, LogOut,
-  BatteryLow, Cpu, HardDrive, MemoryStick, Globe,
-  ChevronRight, Home, Trash2, RefreshCw, Send, Mic,
-  Volume2, Play, Square, AlertCircle, CheckCircle2,
-  X, Zap, Eye, EyeOff, Loader2
+  BatteryLow, Cpu, HardDrive, Globe,
+  RefreshCw, Send, Volume2, AlertCircle, CheckCircle2,
+  X, Loader2, ChevronRight
 } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
+import { doc, onSnapshot, collection, addDoc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function DeviceControlPanel() {
@@ -46,7 +43,8 @@ export default function DeviceControlPanel() {
     </div>
   );
 
-  const isOnline = status?.online && (Date.now() - (status.lastSeen || 0) < 20000);
+  // 60s window: heartbeat every 5s, mobile latency + clock skew can add up
+  const isOnline = status?.online === true && (Date.now() - (status.lastSeen || 0) < 60000);
 
   const tabs = [
     { id: 'power', icon: <Power className="w-4 h-4" />, label: 'Power' },
@@ -141,22 +139,23 @@ export default function DeviceControlPanel() {
 type FeedbackSetter = (fb: { type: 'success' | 'error'; msg: string } | null) => void;
 
 function useSendCommand(deviceId: string, isOnline: boolean, onFeedback: FeedbackSetter) {
-  const { functions: _f } = { functions };
   const [sending, setSending] = useState(false);
 
   const sendCommand = useCallback(async (command: string, params?: Record<string, unknown>) => {
-    if (!isOnline) { onFeedback({ type: 'error', msg: 'Device is offline.' }); return null; }
+    if (!isOnline) {
+      onFeedback({ type: 'error', msg: 'Device is offline — command not sent.' });
+      return null;
+    }
     setSending(true);
     try {
-      let docData: Record<string, unknown>;
-      try {
-        const signCommand = httpsCallable(functions, 'signCommand');
-        const res = await signCommand({ deviceId, command, params });
-        docData = res.data as Record<string, unknown>;
-      } catch {
-        docData = { deviceId, command, params: params || {}, timestamp: Date.now(), status: 'pending', signature: 'MOCK' };
-      }
-      const ref = await addDoc(collection(db, 'commands'), docData);
+      // Write command directly to Firestore — agent listens and picks it up
+      const ref = await addDoc(collection(db, 'commands'), {
+        deviceId,
+        command,
+        params:    params || {},
+        status:    'pending',
+        timestamp: Date.now(),
+      });
       return ref.id;
     } catch (e) {
       onFeedback({ type: 'error', msg: `Failed to send command: ${(e as Error).message}` });
