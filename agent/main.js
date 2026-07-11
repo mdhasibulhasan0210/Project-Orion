@@ -326,7 +326,7 @@ function createSetupWindow() {
 
   setupWindow = new BrowserWindow({
     width: 440,
-    height: 580,
+    height: 620,
     resizable: false,
     center: true,
     frame: false,
@@ -334,7 +334,7 @@ function createSetupWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      sandbox: true,
+      sandbox: false,          // Must be false for contextBridge + preload to work
       preload: path.join(__dirname, 'preload.js')
     },
     icon: path.join(__dirname, 'assets', 'icon.ico')

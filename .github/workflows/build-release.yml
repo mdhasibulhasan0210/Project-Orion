@@ -54,10 +54,13 @@ jobs:
       - name: Rename to standard filename
         shell: pwsh
         run: |
-          $src = "agent\dist\${{ steps.find_installer.outputs.EXE_NAME }}"
-          $dst = "agent\dist\Orion-Agent-Setup.exe"
-          Copy-Item $src $dst
-          Write-Host "Renamed to Orion-Agent-Setup.exe"
+          $exe = Get-ChildItem "agent/dist/*.exe" | Where-Object { $_.Name -notlike "*.blockmap" } | Select-Object -First 1
+          if ($exe) {
+            Copy-Item $exe.FullName "agent/dist/Orion-Agent-Setup.exe"
+            Write-Host "Renamed $($exe.Name) → Orion-Agent-Setup.exe"
+          } else {
+            Write-Error "No .exe found in agent/dist!"
+          }
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

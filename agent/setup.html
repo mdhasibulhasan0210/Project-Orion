@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self'; img-src 'self' data:" />
+  <!-- Security handled by Electron contextIsolation + sandbox:false + contextBridge -->
   <title>Orion Agent Setup</title>
   <link rel="stylesheet" href="setup.css" />
 </head>
@@ -41,7 +41,7 @@
     </div>
 
     <!-- Login Form -->
-    <form id="loginForm" autocomplete="on">
+    <form id="loginForm" autocomplete="on" onsubmit="return false">
       <div class="field-group">
         <label class="field-label" for="email">Email Address</label>
         <div class="input-wrapper">

@@ -1,7 +1,7 @@
 {
   "name": "orion-agent",
   "productName": "Orion Agent",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Orion Remote Management Agent – silently monitors and accepts remote commands from the Orion dashboard.",
   "main": "main.js",
   "author": "Orion Platform <mdhasibulhasan0210@github.com>",
