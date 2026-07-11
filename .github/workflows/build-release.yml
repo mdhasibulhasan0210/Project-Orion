@@ -1,0 +1,102 @@
+name: Build & Release Orion Agent
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g. 1.0.0)'
+        required: true
+        default: '1.0.0'
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    name: Build Windows Installer
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: agent/package-lock.json
+
+      - name: Install agent dependencies
+        working-directory: agent
+        run: npm ci --legacy-peer-deps
+
+      - name: Build Windows installer
+        working-directory: agent
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run build:win
+
+      - name: Find built installer
+        id: find_installer
+        working-directory: agent/dist
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem -Filter "*.exe" | Select-Object -First 1
+          echo "EXE_NAME=$($exe.Name)" >> $env:GITHUB_OUTPUT
+          echo "EXE_PATH=agent/dist/$($exe.Name)" >> $env:GITHUB_OUTPUT
+          echo "EXE_SIZE=$([math]::Round($exe.Length/1MB,1)) MB" >> $env:GITHUB_OUTPUT
+          Write-Host "Found: $($exe.Name) ($([math]::Round($exe.Length/1MB,1)) MB)"
+
+      - name: Rename to standard filename
+        shell: pwsh
+        run: |
+          $src = "agent\dist\${{ steps.find_installer.outputs.EXE_NAME }}"
+          $dst = "agent\dist\Orion-Agent-Setup.exe"
+          Copy-Item $src $dst
+          Write-Host "Renamed to Orion-Agent-Setup.exe"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name || format('v{0}', inputs.version) }}
+          name: Orion Agent ${{ github.ref_name || format('v{0}', inputs.version) }}
+          body: |
+            ## 🚀 Orion Agent ${{ github.ref_name || format('v{0}', inputs.version) }}
+
+            ### Install in 3 steps
+            1. **Download** `Orion-Agent-Setup.exe` below
+            2. **Run** the installer on any Windows 10/11 PC (64-bit)
+            3. **Sign in** with your Orion account → your PC appears in the dashboard instantly!
+
+            ### Features
+            - 🖥️ Real-time monitoring — CPU, RAM, Disk, IP, Uptime
+            - ⚡ Remote power control — Shutdown, Restart, Sleep, Hibernate, Lock
+            - 📸 Screenshot capture + live view mode
+            - 💻 Remote PowerShell terminal with full output
+            - 📁 File manager — browse all drives and directories
+            - 📋 Clipboard sync — read and write remotely
+            - 🔊 Text-to-speech announcements
+            - 🔒 Encrypted credential storage (Windows DPAPI)
+            - 🔄 Auto-update via GitHub Releases
+            - 🚀 Auto-launch at Windows startup (optional)
+
+            ### System Requirements
+            - Windows 10 or 11 (64-bit)
+            - Internet connection
+          files: agent/dist/Orion-Agent-Setup.exe
+          draft: false
+          prerelease: false
+          make_latest: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload installer as artifact (backup)
+        uses: actions/upload-artifact@v4
+        with:
+          name: orion-agent-windows
+          path: agent/dist/Orion-Agent-Setup.exe
+          retention-days: 30
