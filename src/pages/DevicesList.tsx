@@ -1,11 +1,20 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { collection, query, where, onSnapshot, FirestoreError, doc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Device, DeviceStatus } from '../../shared/types';
-import { Monitor, Cpu, HardDrive, Clock, ArrowRight, RefreshCw, Download, Wifi, WifiOff } from 'lucide-react';
+import { Monitor, Clock, ArrowRight, RefreshCw, Download, Wifi, WifiOff } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ErrorCard, SkeletonCard, parseFirebaseError } from '../components/ErrorBoundary';
+
+/** Force a re-render every N ms so Date.now() stays current on mobile */
+function useTicker(intervalMs = 10000) {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), intervalMs);
+    return () => clearInterval(id);
+  }, [intervalMs]);
+}
 
 interface DeviceWithStatus extends Device {
   status?: DeviceStatus;
@@ -156,8 +165,13 @@ export default function DevicesList() {
 
 /* ── Device Card ── */
 function DeviceCard({ device }: { device: DeviceWithStatus }) {
-  // 60s window handles mobile network latency + Firestore propagation + clock skew
-  const isOnline = !!(device.status?.online === true && (Date.now() - (device.status.lastSeen || 0) < 60000));
+  // Re-render every 10s so Date.now() is always fresh (fixes mobile stale state)
+  useTicker(10000);
+
+  // Primary truth: agent explicitly sets online=true/false
+  // Fallback: if lastSeen > 120s ago, treat as offline (handles agent crashes)
+  const isOnline = device.status?.online === true &&
+    (Date.now() - (device.status.lastSeen || 0) < 120000);
   const cpu  = device.status?.cpu  ?? null;
   const ram  = device.status?.ram  ?? null;
   const disk = device.status?.disk ?? null;

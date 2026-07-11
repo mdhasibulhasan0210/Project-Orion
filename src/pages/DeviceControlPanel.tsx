@@ -13,6 +13,15 @@ import {
 import { doc, onSnapshot, collection, addDoc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion';
 
+/** Force a re-render every N ms so Date.now() stays current on mobile */
+function useTicker(intervalMs = 10000) {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), intervalMs);
+    return () => clearInterval(id);
+  }, [intervalMs]);
+}
+
 export default function DeviceControlPanel() {
   const { id } = useParams<{ id: string }>();
   const [device, setDevice] = useState<Device | null>(null);
@@ -37,14 +46,18 @@ export default function DeviceControlPanel() {
     return () => clearTimeout(t);
   }, [commandFeedback]);
 
+  // Re-render every 10s so Date.now() stays fresh on mobile
+  useTicker(10000);
+
   if (!device) return (
     <div className="flex items-center justify-center h-64">
       <Loader2 className="w-8 h-8 text-[#00bfff] animate-spin" />
     </div>
   );
 
-  // 60s window: heartbeat every 5s, mobile latency + clock skew can add up
-  const isOnline = status?.online === true && (Date.now() - (status.lastSeen || 0) < 60000);
+  // Primary: agent explicitly sets online=true/false
+  // Safety fallback: > 120s without heartbeat = treat as offline
+  const isOnline = status?.online === true && (Date.now() - (status.lastSeen || 0) < 120000);
 
   const tabs = [
     { id: 'power', icon: <Power className="w-4 h-4" />, label: 'Power' },

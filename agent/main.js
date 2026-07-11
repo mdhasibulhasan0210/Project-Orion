@@ -1,13 +1,13 @@
-const { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, safeStorage, shell } = require('electron');
+const { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, safeStorage, shell, desktopCapturer } = require('electron');
 const path = require('path');
 const os = require('os');
+const fs = require('fs');
 const { exec } = require('child_process');
 const si = require('systeminformation');
 const { machineIdSync } = require('node-machine-id');
 const Store = require('electron-store');
 const AutoLaunch = require('auto-launch');
 const { autoUpdater } = require('electron-updater');
-const { v4: uuidv4 } = require('uuid');
 const { z } = require('zod');
 
 // Firebase imports
@@ -67,14 +67,36 @@ const CommandSchema = z.object({
   params: z.record(z.unknown()).optional()
 });
 
-// ─── Helper: safe exec ─────────────────────────────────────────────────────────
-function runCmd(command) {
+// ─── Helper: safe exec with 30s timeout ───────────────────────────────────────
+function runCmd(command, timeoutMs = 30000) {
   return new Promise((resolve, reject) => {
-    exec(command, { shell: 'powershell.exe' }, (err, stdout, stderr) => {
+    const child = exec(command, { shell: 'powershell.exe', maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
       if (err) reject(err.message || stderr);
       else resolve(stdout.trim());
     });
+    // Kill child process if it exceeds timeout
+    const timer = setTimeout(() => {
+      child.kill();
+      reject(new Error(`Command timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+    child.on('close', () => clearTimeout(timer));
   });
+}
+
+// ─── Helper: take screenshot via desktopCapturer (fast, no PowerShell) ────────
+async function takeScreenshot() {
+  const sources = await desktopCapturer.getSources({
+    types: ['screen'],
+    thumbnailSize: { width: 1280, height: 720 }
+  });
+  if (!sources || sources.length === 0) throw new Error('No screen source found');
+  // Get the primary screen (first source)
+  const primary = sources[0];
+  const img = primary.thumbnail;
+  // Convert to JPEG buffer
+  const jpegBuffer = img.toJPEG(60); // quality 60 — small but readable
+  const base64 = `data:image/jpeg;base64,${jpegBuffer.toString('base64')}`;
+  return base64;
 }
 
 // ─── Command Executor ──────────────────────────────────────────────────────────
@@ -116,39 +138,21 @@ async function executeCommand(commandId, cmdData) {
         result = { success: true };
         break;
 
-      // Screenshot
+      // Screenshot — uses Electron desktopCapturer, fast & no PowerShell
       case 'screenshot': {
-        const screenshotPath = path.join(os.tmpdir(), `orion_shot_${Date.now()}.jpg`);
-        await runCmd(`
-          Add-Type -AssemblyName System.Windows.Forms;
-          Add-Type -AssemblyName System.Drawing;
-          $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds;
-          $bmp = New-Object System.Drawing.Bitmap($bounds.Width, $bounds.Height);
-          $g = [System.Drawing.Graphics]::FromImage($bmp);
-          $g.CopyFromScreen($bounds.Location, [System.Drawing.Point]::Empty, $bounds.Size);
-          $maxWidth = 1280;
-          if ($bounds.Width -gt $maxWidth) {
-            $ratio = $maxWidth / $bounds.Width;
-            $newH = [int]($bounds.Height * $ratio);
-            $thumb = New-Object System.Drawing.Bitmap($bmp, $maxWidth, $newH);
-            $thumb.Save('${screenshotPath.replace(/\\/g, '\\\\')}', [System.Drawing.Imaging.ImageFormat]::Jpeg);
-          } else {
-            $bmp.Save('${screenshotPath.replace(/\\/g, '\\\\')}', [System.Drawing.Imaging.ImageFormat]::Jpeg);
-          }
-          $g.Dispose(); $bmp.Dispose();
-        `);
-        const fs = require('fs');
-        const imgData = fs.readFileSync(screenshotPath);
-        const base64 = `data:image/jpeg;base64,${imgData.toString('base64')}`;
-        fs.unlinkSync(screenshotPath);
+        const base64 = await takeScreenshot();
         result = { screenshot: base64, timestamp: Date.now() };
         break;
       }
 
-      // Processes
+      // Processes — top 60 by CPU, prevents huge JSON response
       case 'get-processes': {
-        const raw = await runCmd('Get-Process | Select-Object Name, Id, CPU, WorkingSet64 | ConvertTo-Json');
-        result = { processes: JSON.parse(raw) };
+        const raw = await runCmd(
+          'Get-Process | Sort-Object CPU -Descending | Select-Object -First 60 Name, Id, CPU, WorkingSet64 | ConvertTo-Json'
+        );
+        let procs = [];
+        try { procs = JSON.parse(raw); } catch { procs = []; }
+        result = { processes: Array.isArray(procs) ? procs : [procs] };
         break;
       }
       case 'kill-process': {
@@ -182,14 +186,24 @@ async function executeCommand(commandId, cmdData) {
 
       // File manager
       case 'get-drives': {
-        const raw = await runCmd('Get-PSDrive -PSProvider FileSystem | Select-Object Name, Root, Used, Free | ConvertTo-Json');
-        result = { drives: JSON.parse(raw) };
+        const raw = await runCmd(
+          'Get-PSDrive -PSProvider FileSystem | Select-Object Name, Root, Used, Free | ConvertTo-Json'
+        );
+        let drives = [];
+        try { drives = JSON.parse(raw); } catch { drives = []; }
+        result = { drives: Array.isArray(drives) ? drives : [drives] };
         break;
       }
       case 'get-files': {
-        const dirPath = params?.path || 'C:\\';
-        const raw = await runCmd(`Get-ChildItem -Path '${dirPath}' | Select-Object Name, PSIsContainer, Length, LastWriteTime | ConvertTo-Json`);
-        result = { files: JSON.parse(raw || '[]'), path: dirPath };
+        const dirPath = (params?.path || 'C:\\').replace(/'/g, '');
+        // Limit to 150 items, handle permission errors gracefully
+        const raw = await runCmd(
+          `Get-ChildItem -Path '${dirPath}' -ErrorAction SilentlyContinue | ` +
+          `Select-Object -First 150 Name, PSIsContainer, Length, LastWriteTime | ConvertTo-Json -Compress`
+        );
+        let files = [];
+        try { files = JSON.parse(raw || '[]'); } catch { files = []; }
+        result = { files: Array.isArray(files) ? files : (files ? [files] : []), path: dirPath };
         break;
       }
 
