@@ -1,7 +1,6 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { LogOut, Monitor, Bell, Settings, Download, ChevronRight } from 'lucide-react';
-import { OrionLogo } from './OrionLogo';
+import { LogOut, Monitor, Download, ChevronRight, AlignJustify, X } from 'lucide-react';
 import { useState } from 'react';
 
 export default function DashboardLayout() {
@@ -34,8 +33,8 @@ export default function DashboardLayout() {
         {/* Logo */}
         <div className="p-5 border-b border-white/[0.06]">
           <Link to="/" className="flex items-center gap-2.5 group">
-            <div className="w-8 h-8 rounded-lg bg-[#00bfff]/10 border border-[#00bfff]/20 flex items-center justify-center group-hover:bg-[#00bfff]/20 transition-colors">
-              <OrionLogo className="w-4 h-4 text-[#00bfff]" />
+            <div className="w-8 h-8 rounded-lg overflow-hidden border border-[#00bfff]/20 flex-shrink-0">
+              <img src="/logo.png" alt="Orion" className="w-full h-full object-contain" />
             </div>
             <div>
               <div className="text-white font-bold text-sm tracking-tight leading-none">Orion</div>
@@ -106,14 +105,13 @@ export default function DashboardLayout() {
         <header className="md:hidden flex items-center justify-between px-4 py-3 border-b border-white/[0.06] bg-[#0a0d14]">
           <button
             onClick={() => setMobileOpen(true)}
-            className="w-9 h-9 flex flex-col justify-center items-center gap-1.5 rounded-lg hover:bg-white/5 transition-colors"
+            className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white/5 transition-colors text-gray-400 hover:text-white"
+            aria-label="Open menu"
           >
-            <span className="w-5 h-0.5 bg-gray-400 rounded" />
-            <span className="w-5 h-0.5 bg-gray-400 rounded" />
-            <span className="w-3 h-0.5 bg-gray-400 rounded" />
+            <AlignJustify className="w-5 h-5" />
           </button>
           <div className="flex items-center gap-2">
-            <OrionLogo className="w-5 h-5 text-[#00bfff]" />
+            <img src="/logo.png" alt="Orion" className="w-6 h-6 object-contain" />
             <span className="text-white font-bold text-sm">Orion</span>
           </div>
           <div className="w-9" />

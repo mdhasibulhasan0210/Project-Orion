@@ -1,0 +1,5 @@
+/* React Router SPA — redirect all routes to index.html */
+/*  path  redirect  status */
+/dashboard/*  /index.html  200
+/login         /index.html  200
+/*             /index.html  200
